@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Etch-a-Sketch</title>
+</head>
+<body>
+    <div id="displayContainer"></div>
+    <div id="optionsContainer">
+        <div>
+            <label for="setSize">Size:</label>
+            <input type="number" id="setSize" name="setSize" min="1" max="128" value="64">
+        </div>
+        <div>
+            <label for="setColor">Color:</label>
+            <input type="text" id="setColor" class="valid" name="setColor" value="black">
+        </div>
+    </div>
+    <div id="actionsContainer">
+        <button id='eraseBoard'>Erase</button>
+        <button id='drawBoard'>Draw</button>        
+    </div>
+</body>
+<script>
+    class Board {
+        constructor(gridSize) {
+            this.size = gridSize;
+            
+            this.colorPage = "white";
+            this.colorBorder = "black";
+            this.colorActive = "black";
+        };
+
+        resetBoard(session) {
+            this.clearBoard(session);
+            //this.updateBoard();
+            this.drawBoard(session);
+        };
+
+        updateBoard(session) {
+            this.size = this.size;
+        };
+
+        clearBoard(session) {
+            const subSquares = session.display.querySelectorAll('subSquare');
+            subSquares.forEach(subSquare => subSquare.remove());
+
+            const squares = session.display.querySelectorAll('square');
+            squares.forEach(square => square.remove());
+
+            const rows = session.display.querySelectorAll('row');
+            rows.forEach(row => row.remove());
+        };
+
+        eraseBoard(session) {
+            const squares = session.display.querySelectorAll('.square');
+            squares.forEach(square => square.erase(session));
+        };
+
+        saveBoard(session) {
+            session.display.addEventListener('mouseover',function(e) {
+                e.stopPropagation();
+            }, true);
+        };
+
+        drawBoard(session) {
+            const display = session.display;
+            const size = session.gridSize;
+
+            for (let h = 0; h < this.size; h++) {
+                const row = document.createElement('div');
+                row.classList.add('row');
+                row.setAttribute('id',`row${h}`);
+                
+                for (let w = 0; w < this.size; w++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.setAttribute('id',`y-${h},x+${w}`);
+
+                    square.style.height = display.offsetHeight / this.size;
+                    square.style.width = display.offsetWidth / this.size;
+
+                    square.style.backgroundColor = this.colorBorder;
+                    square.style.padding = "0.1%";
+
+                    const subSquare = document.createElement('div');
+                    subSquare.classList.add('subSquare');
+                    subSquare.setAttribute('id',`${square.getAttribute('id')}_sub`);
+
+                    subSquare.style.backgroundColor = this.colorPage;
+                    subSquare.style.height = display.offsetHeight / this.size;
+                    subSquare.style.width = display.offsetWidth / this.size;
+
+                    square.append(subSquare);
+
+                    square.addEventListener('mouseover',function() {
+                        this.querySelector('.subSquare').style.backgroundColor = `${document.querySelector('#setColor').value}`;
+                    });
+
+                    square.erase = function(session) {
+                        this.querySelector('.subSquare').style.backgroundColor = `${session.board.colorPage}`;
+                    };
+
+                    row.append(square);
+                };
+                display.append(row);
+            };
+        };
+    };
+    class GameSession {
+        constructor(gridSize, index) {
+            this.gridSize = gridSize;
+            this.index = index; 
+
+            this.display = document.createElement('div');
+            this.display.classList.add('display');
+            this.display.setAttribute('id',`game${index}`);
+            document.querySelector('#displayContainer').append(this.display);
+
+            this.board = new Board(this.gridSize);
+            this.board.drawBoard(this);
+        };
+    };
+
+    function testColor(e) {
+        const inputBox = document.querySelector('#setColor');
+        const dummy = document.createElement('div');
+
+        try {
+            dummy.style.backgroundColor = e.target.value;
+        } catch (error) {
+            console.log(error);
+        } finally {
+            if (!dummy.style.backgroundColor) {
+                inputBox.classList.remove('valid');
+            } else {
+                inputBox.classList.add('valid');
+            }
+        };
+    };
+
+    let index = 0;
+    savedGames = [];
+
+    const init = new GameSession(document.getElementById("setSize").value, 0); 
+    savedGames.push(init);
+
+    function newGame(index) {
+        index++;
+
+        const old = savedGames[savedGames.length - 1];
+        old.board.saveBoard(old);
+
+        const gridSize = document.getElementById("setSize").value;
+        const game = new GameSession(gridSize, index);
+
+        document.getElementById('displayContainer').lastChild.scrollIntoView({inline:"center"});
+  
+        savedGames.push(game);
+        console.log(index);
+
+        return index;
+    };
+
+    function eraseGame(index) {
+        const old = savedGames[savedGames.length - 1];
+        old.board.eraseBoard(old);
+    }
+
+    document.querySelector('#eraseBoard').addEventListener('click', function() {
+        eraseGame(index);
+    });
+    document.querySelector('#drawBoard').addEventListener('click', function() {
+        index = newGame(index);
+    })
+    document.querySelector('#setColor').addEventListener('input', testColor);
+
+</script>
+</html>
