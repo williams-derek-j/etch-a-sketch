@@ -2,175 +2,245 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe</title>
     <link rel="stylesheet" href="style.css">
-    <title>Etch-a-Sketch</title>
 </head>
 <body>
-    <div id="displayContainer"></div>
-    <div id="optionsContainer">
-        <div>
-            <label for="setSize">Size:</label>
-            <input type="number" id="setSize" name="setSize" min="1" max="128" value="64">
-        </div>
-        <div>
-            <label for="setColor">Color:</label>
-            <input type="text" id="setColor" class="valid" name="setColor" value="black">
-        </div>
+<div id="game">
+    <div id="board"></div>
+    <div id="sidebar">
+        <span>Player 1:</span>
+        <input type="text" id="p1">
+        <span>Wins:</span>
+        <span id="p1w"></span>
+        <br>
+        <span>Player 2</span>
+        <input type="text" id="p2">
+        <span>Wins:</span>
+        <span id="p2w"></span>
+        <button id="start">Start Game</button>
     </div>
-    <div id="actionsContainer">
-        <button id='eraseBoard'>Erase</button>
-        <button id='drawBoard'>Draw</button>        
-    </div>
+</div>
 </body>
 <script>
-    class Board {
-        constructor(gridSize) {
-            this.size = gridSize;
-            
-            this.colorPage = "white";
-            this.colorBorder = "black";
-            this.colorActive = "black";
-        };
-
-        resetBoard(session) {
-            this.clearBoard(session);
-            this.drawBoard(session);
-        };
-
-        clearBoard(session) {
-            const subSquares = session.display.querySelectorAll('subSquare');
-            subSquares.forEach(subSquare => subSquare.remove());
-
-            const squares = session.display.querySelectorAll('square');
-            squares.forEach(square => square.remove());
-
-            const rows = session.display.querySelectorAll('row');
-            rows.forEach(row => row.remove());
-        };
-
-        eraseBoard(session) {
-            const squares = session.display.querySelectorAll('.square');
-            squares.forEach(square => square.erase(session));
-        };
-
-        saveBoard(session) {
-            session.display.addEventListener('mouseover',function(e) {
-                e.stopPropagation();
-            }, true);
-        };
-
-        drawBoard(session) {
-            const display = session.display;
-            const size = session.gridSize;
-
-            for (let h = 0; h < this.size; h++) {
-                const row = document.createElement('div');
-                row.classList.add('row');
-                row.setAttribute('id',`row${h}`);
-                
-                for (let w = 0; w < this.size; w++) {
-                    const square = document.createElement('div');
-                    square.classList.add('square');
-                    square.setAttribute('id',`y-${h},x+${w}`);
-
-                    square.style.height = display.offsetHeight / this.size;
-                    square.style.width = display.offsetWidth / this.size;
-
-                    square.style.backgroundColor = this.colorBorder;
-                    square.style.padding = "0.1%";
-
-                    const subSquare = document.createElement('div');
-                    subSquare.classList.add('subSquare');
-                    subSquare.setAttribute('id',`${square.getAttribute('id')}_sub`);
-
-                    subSquare.style.backgroundColor = this.colorPage;
-                    subSquare.style.height = display.offsetHeight / this.size;
-                    subSquare.style.width = display.offsetWidth / this.size;
-
-                    square.append(subSquare);
-
-                    square.addEventListener('mouseover',function() {
-                        this.querySelector('.subSquare').style.backgroundColor = `${document.querySelector('#setColor').value}`;
-                    });
-
-                    square.erase = function(session) {
-                        this.querySelector('.subSquare').style.backgroundColor = `${session.board.colorPage}`;
-                    };
-
-                    row.append(square);
+class Player {
+    constructor(name, token) {
+        this.name = name;
+        this.token = token;
+        this.wins = 0;
+    }
+    reward() {
+        this.wins++;
+    }
+    stats() {
+        return this.wins;
+    }
+}
+class Tile {
+    constructor(r, c) {
+        this.value = 0;
+        this.r = r;
+        this.c = c;
+    }
+    valueSet(value) {
+        this.value = value;
+    }
+    valueGet() {
+        return(this.value);
+    }
+}
+const ticTacToe = (function() {
+    var events = {
+        events: {},
+        on: function (eventName, fn) {
+            this.events[eventName] = this.events[eventName] || [];
+            this.events[eventName].push(fn);
+        },
+        off: function(eventName, fn) {
+            if (this.events[eventName]) {
+                for (var i = 0; i < this.events[eventName].length; i++) {
+                    if (this.events[eventName][i] === fn) {
+                        this.events[eventName].splice(i, 1);
+                        break;
+                    }
                 };
-                display.append(row);
-            };
-        };
-    };
-    class GameSession {
-        constructor(gridSize, index) {
-            this.gridSize = gridSize;
-            this.index = index; 
-
-            this.display = document.createElement('div');
-            this.display.classList.add('display');
-            this.display.setAttribute('id',`game${index}`);
-            document.querySelector('#displayContainer').append(this.display);
-
-            this.board = new Board(this.gridSize);
-            this.board.drawBoard(this);
-        };
-    };
-
-    function testColor(e) {
-        const inputBox = document.querySelector('#setColor');
-        const dummy = document.createElement('div');
-
-        try {
-            dummy.style.backgroundColor = e.target.value;
-        } catch (error) {
-            console.log(error);
-        } finally {
-            if (!dummy.style.backgroundColor) {
-                inputBox.classList.remove('valid');
-            } else {
-                inputBox.classList.add('valid');
             }
-        };
+        },
+        emit: function (eventName, data) {
+            if (this.events[eventName]) {
+                this.events[eventName].forEach(function(fn) {
+                    fn(data);
+                });
+            }
+        }
     };
 
-    let index = 0;
-    savedGames = [];
+    const screen = (function(){
+        function boardRestart() {
+            boardClear();
+            boardRender();
+        }
+        function boardClear(args) {
+            while (board.firstChild) {
+                board.removeChild(board.lastChild);
+            }
+        }
+        function boardRender(args) {
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const container = document.createElement('div');
+                    container.setAttribute('overflow', 'hidden');
 
-    const init = new GameSession(document.getElementById("setSize").value, 0); 
-    savedGames.push(init);
+                    const tile = document.createElement('button');
+                    tile.setAttribute('grid-area', `${r} / ${c} / ${r+1} / ${c+1}`);
+                    tile.setAttribute('data-r', `${r}`);
+                    tile.setAttribute('data-c', `${c}`);
+                    tile.addEventListener('click', function(){
+                        events.emit('tileChosen', {tile:tile, r:r, c:c})}
+                    );
+                    container.appendChild(tile);
+                    board.appendChild(container);
+                }
+            }
+        }
+        function tokenDraw(args) {
+            let token = args.token;
+            let tile = args.tile;
 
-    function newGame(index) {
-        index++;
+            if (token === 1) {
+                tile.parentElement.classList.add('p1');
+            } else if (token === 2) {
+                tile.parentElement.classList.add('p2');
+            }
+            tile.remove();
+        }
+        function statsUpdate(args) {
+            p1w.setAttribute('textContent', `${args[0].stats()}`);
+            p2w.setAttribute('textContent', `${args[1].stats()}`);
+        }
 
-        const old = savedGames[savedGames.length - 1];
-        old.board.saveBoard(old);
+        events.on('tokenPlaced', tokenDraw);
+        events.on('gameFinished', boardClear);
+        events.on('playersUpdated', statsUpdate);
+        events.on('gameInitiated', boardRender);
+        events.on('gameRestarted', boardRestart);
 
-        const gridSize = document.getElementById("setSize").value;
-        const game = new GameSession(gridSize, index);
+        return {};
+    })();
 
-        document.getElementById('displayContainer').lastChild.scrollIntoView({inline:"center"});
-  
-        savedGames.push(game);
-        console.log(index);
+    const game = (function(){
+        function generate() {
+            board = [];
+            turn = 1;
 
-        return index;
-    };
+            for (let r = 0; r < 3; r++) {
+                board[r] = [];
 
-    function eraseGame(index) {
-        const old = savedGames[savedGames.length - 1];
-        old.board.eraseBoard(old);
+                for (let c = 0; c < 3; c++) {
+                    board[r][c] = new Tile(r, c);
+                }
+            }
+        }
+        function check() {
+            var checking = true;
+            var winner = 0;
+
+            this.triples.forEach((array) => {
+                if (checking) {
+                    var total = array.reduce((total, tile) => {
+                        return total + board[tile[0]][tile[1]].valueGet(); // coordinates as an array [y,x]
+                    }, "")
+
+                    if (total === "111") {
+                        winner = 1;
+                        checking = false;
+                    } else if (total === "222") {
+                        winner = 2;
+                        checking = false;
+                    };
+                };
+            });
+            return winner;
+        }
+        function place(args) {
+            let tile = args.tile;
+            let token = turn % 2 === 1 ? 1 : 2;
+            let r = args.r;
+            let c = args.c;
+
+            if (board[r][c].valueGet() === 0) {
+                board[r][c].valueSet(token);
+
+                events.emit('tokenPlaced', {r:r, c:c, token:token, tile:tile});
+            } else {
+                console.log("Invalid move: cell occupied");
+            }
+            let winner = check();
+            if (winner !== 0) {
+                players[winner - 1].reward();
+
+                events.emit("playersUpdated", players);
+                events.emit("gameFinished");
+
+                console.log(`Game over! Player ${winner} won!`);
+            }
+            turn++;
+        }
+        function init(args) {
+            generate();
+
+            players.push(new Player(`${args.p1.value}, 1`));
+            players.push(new Player(`${args.p2.value}, 2`));
+
+            console.log("Starting new game!");
+        }
+        triples = [
+            [[0,0],[0,1],[0,2]],
+            [[1,0],[1,1],[1,2]],
+            [[2,0],[2,1],[2,2]],
+            [[0,0],[1,0],[2,0]],
+            [[0,1],[1,1],[2,1]],
+            [[0,2],[1,2],[2,2]],
+            [[0,0],[1,1],[2,2]],
+            [[2,0],[1,1],[0,2]]];
+        let board = [];
+        let players = [];
+        let turn = 1;
+        events.on('tileChosen', place)
+        events.on('gameInitiated', init)
+        events.on('gameRestarted', generate);
+
+        return {};
+    })();
+    const board = document.querySelector('#board');
+    const sidebar = document.querySelector('#sidebar');
+    const p1w = document.querySelector('#p1w');
+    const p2w = document.querySelector('#p2w');
+    const start = document.querySelector('#start');
+
+    let players = {
+        p1:document.querySelector('#p1'),
+        p2:document.querySelector('#p2'),
     }
 
-    document.querySelector('#eraseBoard').addEventListener('click', function() {
-        eraseGame(index);
-    });
-    document.querySelector('#drawBoard').addEventListener('click', function() {
-        index = newGame(index);
-    })
-    document.querySelector('#setColor').addEventListener('input', testColor);
+    function restartGame() {
 
+        events.emit('gameRestarted');
+    }
+    function startGame() {
+
+        events.emit('gameInitiated', players);
+        start.remove();
+
+        const restart = document.createElement('button');
+        restart.setAttribute('innerText', 'Restart Game');
+        restart.setAttribute('margin-top', 'auto');
+        restart.addEventListener('click', restartGame)
+        sidebar.appendChild(restart);
+    }
+    start.addEventListener('click', startGame);
+
+    return {};
+})();
 </script>
 </html>
